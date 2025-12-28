@@ -4,6 +4,7 @@
   "name": "Ollama AI Provider",
   "version": "1.0.0",
   "description": "Connect Stina to your local Ollama instance for private, offline AI conversations.",
+  "type": "provider",
   "author": {
     "name": "Stina Team",
     "url": "https://github.com/einord"

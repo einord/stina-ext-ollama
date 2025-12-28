@@ -35,7 +35,7 @@
       {
         "id": "defaultModel",
         "type": "string",
-        "default": "llama3.2",
+        "default": "llama3.1:8b",
         "title": "Default Model",
         "description": "Model to use when none is specified"
       }

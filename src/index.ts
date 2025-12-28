@@ -109,7 +109,7 @@ function createOllamaProvider(context: ExtensionContext): AIProvider {
     ): AsyncGenerator<StreamEvent, void, unknown> {
       const settings = await context.settings!.getAll<OllamaSettings>()
       const url = settings.url || 'http://localhost:11434'
-      const model = options.model || settings.defaultModel || 'llama3.2'
+      const model = options.model || settings.defaultModel || 'llama3.1:8b'
 
       context.log.debug('Starting chat with Ollama', { model, messageCount: messages.length })
 
@@ -120,6 +120,8 @@ function createOllamaProvider(context: ExtensionContext): AIProvider {
       }))
 
       try {
+        // NOTE: stream: false because worker message-passing doesn't support streaming fetch yet
+        // The host's handleNetworkFetch uses response.text() which blocks on streaming responses
         const response = await context.network!.fetch(`${url}/api/chat`, {
           method: 'POST',
           headers: {
@@ -128,7 +130,7 @@ function createOllamaProvider(context: ExtensionContext): AIProvider {
           body: JSON.stringify({
             model,
             messages: ollamaMessages,
-            stream: true,
+            stream: false,
             options: {
               temperature: options.temperature,
               num_predict: options.maxTokens,
@@ -141,71 +143,23 @@ function createOllamaProvider(context: ExtensionContext): AIProvider {
           throw new Error(`Ollama error: ${response.status} - ${errorText}`)
         }
 
-        // Parse the streaming response
-        const body = response.body
-        if (!body) {
-          throw new Error('No response body')
+        // With stream: false, we get a single JSON response
+        const data = (await response.json()) as OllamaChatResponse
+
+        if (data.message?.content) {
+          yield { type: 'content', text: data.message.content }
         }
 
-        const reader = body.getReader()
-        const decoder = new TextDecoder()
-        let buffer = ''
-
-        while (true) {
-          const { done, value } = await reader.read()
-
-          if (done) {
-            break
-          }
-
-          buffer += decoder.decode(value, { stream: true })
-
-          // Process complete lines
-          const lines = buffer.split('\n')
-          buffer = lines.pop() || '' // Keep incomplete line in buffer
-
-          for (const line of lines) {
-            if (!line.trim()) continue
-
-            try {
-              const data = JSON.parse(line) as OllamaChatResponse
-
-              if (data.message?.content) {
-                yield { type: 'content', text: data.message.content }
+        // Include usage stats if available
+        const usage =
+          data.prompt_eval_count !== undefined && data.eval_count !== undefined
+            ? {
+                inputTokens: data.prompt_eval_count,
+                outputTokens: data.eval_count,
               }
+            : undefined
 
-              if (data.done) {
-                // Include usage stats if available
-                const usage =
-                  data.prompt_eval_count !== undefined && data.eval_count !== undefined
-                    ? {
-                        inputTokens: data.prompt_eval_count,
-                        outputTokens: data.eval_count,
-                      }
-                    : undefined
-
-                yield { type: 'done', usage }
-              }
-            } catch {
-              context.log.warn('Failed to parse Ollama response line', { line })
-            }
-          }
-        }
-
-        // Process any remaining data in buffer
-        if (buffer.trim()) {
-          try {
-            const data = JSON.parse(buffer) as OllamaChatResponse
-            if (data.message?.content) {
-              yield { type: 'content', text: data.message.content }
-            }
-            if (data.done) {
-              yield { type: 'done' }
-            }
-          } catch {
-            // Ignore incomplete data
-          }
-        }
+        yield { type: 'done', usage }
       } catch (error) {
         context.log.error('Ollama chat error', {
           error: error instanceof Error ? error.message : String(error),

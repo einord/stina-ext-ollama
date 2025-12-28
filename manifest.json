@@ -1,0 +1,51 @@
+{
+  "$schema": "https://stina.app/schemas/extension-manifest.json",
+  "id": "ollama-provider",
+  "name": "Ollama AI Provider",
+  "version": "1.0.0",
+  "description": "Connect Stina to your local Ollama instance for private, offline AI conversations.",
+  "author": {
+    "name": "Stina Team",
+    "url": "https://github.com/einord"
+  },
+  "repository": "https://github.com/einord/stina-ext-ollama",
+  "license": "MIT",
+  "engines": {
+    "stina": ">=0.5.0"
+  },
+  "platforms": ["web", "electron", "tui"],
+  "main": "dist/index.js",
+
+  "permissions": [
+    "network:localhost",
+    "settings.register",
+    "provider.register"
+  ],
+
+  "contributes": {
+    "settings": [
+      {
+        "id": "url",
+        "type": "string",
+        "default": "http://localhost:11434",
+        "title": "Ollama URL",
+        "description": "URL to your Ollama server"
+      },
+      {
+        "id": "defaultModel",
+        "type": "string",
+        "default": "llama3.2",
+        "title": "Default Model",
+        "description": "Model to use when none is specified"
+      }
+    ],
+
+    "providers": [
+      {
+        "id": "ollama",
+        "name": "Ollama",
+        "description": "Local AI models via Ollama"
+      }
+    ]
+  }
+}

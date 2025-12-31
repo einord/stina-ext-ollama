@@ -1,6 +1,6 @@
 {
   "name": "stina-ext-ollama",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Ollama AI provider extension for Stina",
   "type": "module",
   "main": "dist/index.js",

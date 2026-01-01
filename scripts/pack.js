@@ -11,7 +11,7 @@
  * Output is placed in the releases/ directory.
  */
 
-import { createWriteStream, readFileSync, existsSync, mkdirSync } from 'node:fs'
+import { readFileSync, existsSync, mkdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execSync } from 'node:child_process'

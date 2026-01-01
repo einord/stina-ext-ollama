@@ -11,17 +11,15 @@ import {
   type ModelInfo,
   type ChatMessage,
   type ChatOptions,
+  type GetModelsOptions,
   type StreamEvent,
   type Disposable,
 } from '@stina/extension-api/runtime'
 
 /**
- * Extension settings interface
+ * Default URL for Ollama server
  */
-interface OllamaSettings extends Record<string, unknown> {
-  url: string
-  defaultModel: string
-}
+const DEFAULT_OLLAMA_URL = 'http://localhost:11434'
 
 /**
  * Ollama API response types
@@ -70,9 +68,9 @@ function createOllamaProvider(context: ExtensionContext): AIProvider {
     id: 'ollama',
     name: 'Ollama',
 
-    async getModels(): Promise<ModelInfo[]> {
-      const settings = await context.settings!.getAll<OllamaSettings>()
-      const url = settings.url || 'http://localhost:11434'
+    async getModels(options?: GetModelsOptions): Promise<ModelInfo[]> {
+      // Get URL from options.settings (per-model config) or use default
+      const url = (options?.settings?.url as string) || DEFAULT_OLLAMA_URL
 
       context.log.debug('Fetching models from Ollama', { url })
 
@@ -107,11 +105,12 @@ function createOllamaProvider(context: ExtensionContext): AIProvider {
       messages: ChatMessage[],
       options: ChatOptions
     ): AsyncGenerator<StreamEvent, void, unknown> {
-      const settings = await context.settings!.getAll<OllamaSettings>()
-      const url = settings.url || 'http://localhost:11434'
-      const model = options.model || settings.defaultModel || 'llama3.1:8b'
+      // Get URL from options.settings (per-model config) or use default
+      const url = (options.settings?.url as string) || DEFAULT_OLLAMA_URL
+      // Model must be provided in options
+      const model = options.model || 'llama3.2:8b'
 
-      context.log.debug('Starting chat with Ollama', { model, messageCount: messages.length })
+      context.log.debug('Starting chat with Ollama', { url, model, messageCount: messages.length })
 
       // Convert messages to Ollama format
       const ollamaMessages: OllamaChatMessage[] = messages.map((m) => ({

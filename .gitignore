@@ -4,6 +4,9 @@ node_modules/
 # Build output
 dist/
 
+# Release artifacts
+releases/
+
 # IDE
 .idea/
 .vscode/
@@ -17,8 +20,11 @@ Thumbs.db
 # Logs
 *.log
 
-# Package
+# Package artifacts (legacy, now in releases/)
 *.zip
 
 # Dev dependencies (local tarball)
 stina-extension-api-*.tgz
+
+# npm lock file (using pnpm)
+package-lock.json

@@ -7,6 +7,7 @@ Connect [Stina](https://github.com/einord/stina) to your local [Ollama](https://
 - **Local AI**: Run AI models entirely on your machine
 - **Privacy**: Your conversations never leave your computer
 - **Model Selection**: Use any model available in your Ollama installation
+- **Streaming (planned)**: Real-time streaming responses will be added in a future release
 
 ## Requirements
 
@@ -85,7 +86,7 @@ src/
 Releases are created automatically when changes to `manifest.json` are pushed to the `main` branch. To create a new release:
 
 1. Update the version in `manifest.json`
-2. Update `CHANGELOG.md` with release notes
+2. Prepare release notes (to be added to the GitHub Release description)
 3. Create a PR to `main`
 4. Once merged, GitHub Actions will automatically create the release
 

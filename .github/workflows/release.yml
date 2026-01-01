@@ -40,7 +40,7 @@ jobs:
       - name: Get version from manifest
         id: version
         run: |
-          VERSION=$(node -p "require('./manifest.json').version")
+          VERSION=$(jq -r '.version' manifest.json)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Extension version: $VERSION"
 
@@ -77,7 +77,7 @@ jobs:
             
             ### Changes
             
-            See [CHANGELOG](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details.
+            See the [GitHub Releases](https://github.com/${{ github.repository }}/releases) page for details.
           files: releases/ollama-provider-${{ steps.version.outputs.version }}.zip
           draft: false
           prerelease: false

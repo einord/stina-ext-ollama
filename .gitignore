@@ -23,8 +23,5 @@ Thumbs.db
 # Package artifacts (legacy, now in releases/)
 *.zip
 
-# Dev dependencies (local tarball)
-stina-extension-api-*.tgz
-
 # npm lock file (using pnpm)
 package-lock.json

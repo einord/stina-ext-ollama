@@ -31,6 +31,19 @@
         "suggestedDefaultModel": "llama3.2:8b",
         "defaultSettings": {
           "url": "http://localhost:11434"
+        },
+        "configSchema": {
+          "order": ["url"],
+          "properties": {
+            "url": {
+              "type": "url",
+              "title": "Server URL",
+              "description": "URL to your Ollama server",
+              "placeholder": "http://localhost:11434",
+              "default": "http://localhost:11434",
+              "required": true
+            }
+          }
         }
       }
     ]

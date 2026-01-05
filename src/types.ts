@@ -39,8 +39,32 @@ export interface OllamaModelDetails {
  * Ollama chat message format
  */
 export interface OllamaChatMessage {
-  role: 'user' | 'assistant' | 'system'
+  role: 'user' | 'assistant' | 'system' | 'tool'
   content: string
+  /** For assistant messages: tool calls made by the model */
+  tool_calls?: OllamaToolCall[]
+}
+
+/**
+ * Ollama tool call
+ */
+export interface OllamaToolCall {
+  function: {
+    name: string
+    arguments: Record<string, unknown>
+  }
+}
+
+/**
+ * Ollama tool definition
+ */
+export interface OllamaTool {
+  type: 'function'
+  function: {
+    name: string
+    description: string
+    parameters?: Record<string, unknown>
+  }
 }
 
 /**
@@ -49,7 +73,7 @@ export interface OllamaChatMessage {
 export interface OllamaChatResponse {
   model: string
   created_at: string
-  message: OllamaChatMessage
+  message: OllamaChatMessageResponse
   done: boolean
   total_duration?: number
   load_duration?: number
@@ -57,4 +81,13 @@ export interface OllamaChatResponse {
   prompt_eval_duration?: number
   eval_count?: number
   eval_duration?: number
+}
+
+/**
+ * Response message format (may include tool_calls)
+ */
+export interface OllamaChatMessageResponse {
+  role: 'assistant'
+  content: string
+  tool_calls?: OllamaToolCall[]
 }

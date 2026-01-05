@@ -300,7 +300,7 @@ packages:
     os: [win32]
 
   '@stina/extension-api@file:stina-extension-api-0.5.0.tgz':
-    resolution: {integrity: sha512-g0n4Tr3Cvc2j/6CrNYKNG4ceTDRQGelICwLHqFkHN4ARwwf7gMONMUeQDViJcTXjj+WafAsRCa/KfmPNozTP2w==, tarball: file:stina-extension-api-0.5.0.tgz}
+    resolution: {integrity: sha512-0Aclu/a6BmQXZB371joJLUotUbwzkyLDo1Q47ZD1QEi1+jn3hzKoEfCM7GOeHFNaFI9UaTTiy4q08kZPCpAgWw==, tarball: file:stina-extension-api-0.5.0.tgz}
     version: 0.5.0
 
   '@types/estree@1.0.8':

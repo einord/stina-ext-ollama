@@ -18,9 +18,15 @@ import type {
 import { DEFAULT_OLLAMA_URL, DEFAULT_MODEL, PROVIDER_ID, PROVIDER_NAME } from './constants.js'
 import type { OllamaTagsResponse, OllamaChatResponse, OllamaChatMessage, OllamaTool } from './types.js'
 
+let toolCallCounter = 0
+
 /** Simple ID generator for tool calls */
 function generateToolCallId(): string {
-  return `call_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+  toolCallCounter++
+  if (toolCallCounter >= Number.MAX_SAFE_INTEGER) {
+    toolCallCounter = 1
+  }
+  return `call_${Date.now()}_${toolCallCounter.toString(36)}`
 }
 
 /**
@@ -165,6 +171,11 @@ async function* streamChat(
     // With stream: false, we get a single JSON response
     const data = (await response.json()) as OllamaChatResponse
 
+    // Emit regular content response if present, even when tool_calls exist
+    if (data.message?.content) {
+      yield { type: 'content', text: data.message.content }
+    }
+
     // Check if the model wants to use tools
     if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
       // Emit tool_start events for each tool call
@@ -177,9 +188,6 @@ async function* streamChat(
           toolCallId,
         }
       }
-    } else if (data.message?.content) {
-      // Regular content response
-      yield { type: 'content', text: data.message.content }
     }
 
     // Include usage stats if available

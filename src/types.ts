@@ -41,7 +41,7 @@ export interface OllamaModelDetails {
 export interface OllamaChatMessage {
   role: 'user' | 'assistant' | 'system' | 'tool'
   content: string
-  /** For assistant messages: tool calls made by the model */
+  /** Tool calls made by the model. Typically present only in assistant role messages. */
   tool_calls?: OllamaToolCall[]
 }
 

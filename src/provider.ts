@@ -22,7 +22,10 @@ let toolCallCounter = 0
 
 /** Simple ID generator for tool calls */
 function generateToolCallId(): string {
-  toolCallCounter = (toolCallCounter + 1) % Number.MAX_SAFE_INTEGER
+  toolCallCounter++
+  if (toolCallCounter >= Number.MAX_SAFE_INTEGER) {
+    toolCallCounter = 1
+  }
   return `call_${Date.now()}_${toolCallCounter.toString(36)}`
 }
 

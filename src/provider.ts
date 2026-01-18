@@ -119,6 +119,46 @@ function convertMessageToOllama(message: ChatMessage): OllamaChatMessage {
 }
 
 /**
+ * Process a single NDJSON line from the Ollama streaming response
+ */
+async function* processStreamLine(
+  line: string,
+  context: ExtensionContext
+): AsyncGenerator<StreamEvent, OllamaChatResponse | null, unknown> {
+  try {
+    const data = JSON.parse(line) as OllamaChatResponse
+
+    if (data.message?.content) {
+      yield { type: 'content', text: data.message.content }
+    }
+
+    if (data.done) {
+      // Handle tool calls (only present in final response)
+      if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
+        for (const toolCall of data.message.tool_calls) {
+          const toolCallId = generateToolCallId()
+          yield {
+            type: 'tool_start',
+            name: toolCall.function.name,
+            input: toolCall.function.arguments,
+            toolCallId,
+          }
+        }
+      }
+      return data
+    }
+
+    return null
+  } catch (parseError) {
+    context.log.warn('Failed to parse streaming chunk', {
+      line,
+      error: parseError instanceof Error ? parseError.message : String(parseError),
+    })
+    return null
+  }
+}
+
+/**
  * Streams a chat response from the Ollama server.
  * Uses streaming fetch to yield content progressively as it arrives.
  */
@@ -165,17 +205,10 @@ async function* streamChat(
 
     // Check for HTTP errors if the stream exposes response metadata
     const streamAny = stream as any
-    if (streamAny) {
-      if (typeof streamAny.status === 'number' && streamAny.status >= 400) {
-        const status = streamAny.status
-        const statusText = typeof streamAny.statusText === 'string' ? streamAny.statusText : 'HTTP error'
-        throw new Error(`Ollama streaming chat request failed with status ${status}: ${statusText}`)
-      }
-      if (typeof streamAny.ok === 'boolean' && !streamAny.ok) {
-        const status = typeof streamAny.status === 'number' ? streamAny.status : 'unknown'
-        const statusText = typeof streamAny.statusText === 'string' ? streamAny.statusText : 'HTTP error'
-        throw new Error(`Ollama streaming chat request failed with status ${status}: ${statusText}`)
-      }
+    if (streamAny && typeof streamAny.ok === 'boolean' && !streamAny.ok) {
+      const status = typeof streamAny.status === 'number' ? streamAny.status : 'unknown'
+      const statusText = typeof streamAny.statusText === 'string' ? streamAny.statusText : 'HTTP error'
+      throw new Error(`Ollama streaming chat request failed with status ${status}: ${statusText}`)
     }
 
     let buffer = ''
@@ -191,69 +224,20 @@ async function* streamChat(
       for (const line of lines) {
         if (!line.trim()) continue
 
-        try {
-          const data = JSON.parse(line) as OllamaChatResponse
-
-          // Ollama sends cumulative content, so we yield the full text each time
-          // ChatStreamService will handle replacing (not appending) the content
-          if (data.message?.content) {
-            yield { type: 'content', text: data.message.content }
-          }
-
-          if (data.done) {
-            finalResponse = data
-
-            // Handle tool calls (only present in final response)
-            if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
-              for (const toolCall of data.message.tool_calls) {
-                const toolCallId = generateToolCallId()
-                yield {
-                  type: 'tool_start',
-                  name: toolCall.function.name,
-                  input: toolCall.function.arguments,
-                  toolCallId,
-                }
-              }
-            }
-          }
-        } catch (parseError) {
-          context.log.warn('Failed to parse streaming chunk', {
-            line,
-            error: parseError instanceof Error ? parseError.message : String(parseError),
-          })
+        // Ollama sends cumulative content, so we yield the full text each time
+        // ChatStreamService will handle replacing (not appending) the content
+        const result = yield* processStreamLine(line, context)
+        if (result) {
+          finalResponse = result
         }
       }
     }
 
     // Process any remaining data in the buffer (in case the final chunk lacked a trailing newline)
     if (buffer.trim()) {
-      try {
-        const data = JSON.parse(buffer) as OllamaChatResponse
-
-        if (data.message?.content) {
-          yield { type: 'content', text: data.message.content }
-        }
-
-        if (data.done) {
-          finalResponse = data
-
-          if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
-            for (const toolCall of data.message.tool_calls) {
-              const toolCallId = generateToolCallId()
-              yield {
-                type: 'tool_start',
-                name: toolCall.function.name,
-                input: toolCall.function.arguments,
-                toolCallId,
-              }
-            }
-          }
-        }
-      } catch (parseError) {
-        context.log.warn('Failed to parse remaining streaming buffer', {
-          line: buffer,
-          error: parseError instanceof Error ? parseError.message : String(parseError),
-        })
+      const result = yield* processStreamLine(buffer, context)
+      if (result) {
+        finalResponse = result
       }
     }
 

@@ -235,9 +235,15 @@ async function* streamChat(
 
     // Process any remaining data in the buffer (in case the final chunk lacked a trailing newline)
     if (buffer.trim()) {
-      const result = yield* processStreamLine(buffer, context)
-      if (result) {
-        finalResponse = result
+      // Split in case there are multiple lines in the remaining buffer
+      const remainingLines = buffer.split('\n')
+      for (const line of remainingLines) {
+        if (!line.trim()) continue
+
+        const result = yield* processStreamLine(line, context)
+        if (result) {
+          finalResponse = result
+        }
       }
     }
 

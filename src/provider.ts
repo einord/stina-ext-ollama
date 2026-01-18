@@ -163,6 +163,21 @@ async function* streamChat(
       body: JSON.stringify(requestBody),
     })
 
+    // Check for HTTP errors if the stream exposes response metadata
+    const streamAny = stream as any
+    if (streamAny) {
+      if (typeof streamAny.status === 'number' && streamAny.status >= 400) {
+        const status = streamAny.status
+        const statusText = typeof streamAny.statusText === 'string' ? streamAny.statusText : 'HTTP error'
+        throw new Error(`Ollama streaming chat request failed with status ${status}: ${statusText}`)
+      }
+      if (typeof streamAny.ok === 'boolean' && !streamAny.ok) {
+        const status = typeof streamAny.status === 'number' ? streamAny.status : 'unknown'
+        const statusText = typeof streamAny.statusText === 'string' ? streamAny.statusText : 'HTTP error'
+        throw new Error(`Ollama streaming chat request failed with status ${status}: ${statusText}`)
+      }
+    }
+
     let buffer = ''
     let finalResponse: OllamaChatResponse | null = null
 
@@ -208,6 +223,43 @@ async function* streamChat(
           })
         }
       }
+    }
+
+    // Process any remaining data in the buffer (in case the final chunk lacked a trailing newline)
+    if (buffer.trim()) {
+      try {
+        const data = JSON.parse(buffer) as OllamaChatResponse
+
+        if (data.message?.content) {
+          yield { type: 'content', text: data.message.content }
+        }
+
+        if (data.done) {
+          finalResponse = data
+
+          if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
+            for (const toolCall of data.message.tool_calls) {
+              const toolCallId = generateToolCallId()
+              yield {
+                type: 'tool_start',
+                name: toolCall.function.name,
+                input: toolCall.function.arguments,
+                toolCallId,
+              }
+            }
+          }
+        }
+      } catch (parseError) {
+        context.log.warn('Failed to parse remaining streaming buffer', {
+          line: buffer,
+          error: parseError instanceof Error ? parseError.message : String(parseError),
+        })
+      }
+    }
+
+    // Verify that we received a complete stream with a final response
+    if (!finalResponse) {
+      context.log.warn('Streaming response completed without receiving final chunk (done=true)')
     }
 
     // Include usage stats if available from final response

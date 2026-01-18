@@ -119,6 +119,46 @@ function convertMessageToOllama(message: ChatMessage): OllamaChatMessage {
 }
 
 /**
+ * Process a single NDJSON line from the Ollama streaming response
+ */
+async function* processStreamLine(
+  line: string,
+  context: ExtensionContext
+): AsyncGenerator<StreamEvent, OllamaChatResponse | null, unknown> {
+  try {
+    const data = JSON.parse(line) as OllamaChatResponse
+
+    if (data.message?.content) {
+      yield { type: 'content', text: data.message.content }
+    }
+
+    if (data.done) {
+      // Handle tool calls (only present in final response)
+      if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
+        for (const toolCall of data.message.tool_calls) {
+          const toolCallId = generateToolCallId()
+          yield {
+            type: 'tool_start',
+            name: toolCall.function.name,
+            input: toolCall.function.arguments,
+            toolCallId,
+          }
+        }
+      }
+      return data
+    }
+
+    return null
+  } catch (parseError) {
+    context.log.warn('Failed to parse streaming chunk', {
+      line,
+      error: parseError instanceof Error ? parseError.message : String(parseError),
+    })
+    return null
+  }
+}
+
+/**
  * Streams a chat response from the Ollama server.
  * Uses streaming fetch to yield content progressively as it arrives.
  */
@@ -163,6 +203,14 @@ async function* streamChat(
       body: JSON.stringify(requestBody),
     })
 
+    // Check for HTTP errors if the stream exposes response metadata
+    const streamAny = stream as any
+    if (streamAny && typeof streamAny.ok === 'boolean' && !streamAny.ok) {
+      const status = typeof streamAny.status === 'number' ? streamAny.status : 'unknown'
+      const statusText = typeof streamAny.statusText === 'string' ? streamAny.statusText : 'HTTP error'
+      throw new Error(`Ollama streaming chat request failed with status ${status}: ${statusText}`)
+    }
+
     let buffer = ''
     let finalResponse: OllamaChatResponse | null = null
 
@@ -176,38 +224,32 @@ async function* streamChat(
       for (const line of lines) {
         if (!line.trim()) continue
 
-        try {
-          const data = JSON.parse(line) as OllamaChatResponse
-
-          // Ollama sends cumulative content, so we yield the full text each time
-          // ChatStreamService will handle replacing (not appending) the content
-          if (data.message?.content) {
-            yield { type: 'content', text: data.message.content }
-          }
-
-          if (data.done) {
-            finalResponse = data
-
-            // Handle tool calls (only present in final response)
-            if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
-              for (const toolCall of data.message.tool_calls) {
-                const toolCallId = generateToolCallId()
-                yield {
-                  type: 'tool_start',
-                  name: toolCall.function.name,
-                  input: toolCall.function.arguments,
-                  toolCallId,
-                }
-              }
-            }
-          }
-        } catch (parseError) {
-          context.log.warn('Failed to parse streaming chunk', {
-            line,
-            error: parseError instanceof Error ? parseError.message : String(parseError),
-          })
+        // Ollama sends cumulative content, so we yield the full text each time
+        // ChatStreamService will handle replacing (not appending) the content
+        const result = yield* processStreamLine(line, context)
+        if (result) {
+          finalResponse = result
         }
       }
+    }
+
+    // Process any remaining data in the buffer (in case the final chunk lacked a trailing newline)
+    if (buffer.trim()) {
+      // Split in case there are multiple lines in the remaining buffer
+      const remainingLines = buffer.split('\n')
+      for (const line of remainingLines) {
+        if (!line.trim()) continue
+
+        const result = yield* processStreamLine(line, context)
+        if (result) {
+          finalResponse = result
+        }
+      }
+    }
+
+    // Verify that we received a complete stream with a final response
+    if (!finalResponse) {
+      context.log.warn('Streaming response completed without receiving final chunk (done=true)')
     }
 
     // Include usage stats if available from final response

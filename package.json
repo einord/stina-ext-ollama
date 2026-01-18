@@ -1,6 +1,6 @@
 {
   "name": "stina-ext-ollama",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "description": "Ollama AI provider extension for Stina",
   "type": "module",
   "main": "dist/index.js",
@@ -27,7 +27,7 @@
     "url": "https://github.com/einord/stina-ext-ollama.git"
   },
   "devDependencies": {
-    "@stina/extension-api": "^0.6.5",
+    "@stina/extension-api": "^0.15.0",
     "tsup": "^8.0.0",
     "typescript": "^5.3.0"
   }

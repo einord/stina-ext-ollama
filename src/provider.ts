@@ -119,7 +119,48 @@ function convertMessageToOllama(message: ChatMessage): OllamaChatMessage {
 }
 
 /**
- * Streams a chat response from the Ollama server
+ * Process a single NDJSON line from the Ollama streaming response
+ */
+async function* processStreamLine(
+  line: string,
+  context: ExtensionContext
+): AsyncGenerator<StreamEvent, OllamaChatResponse | null, unknown> {
+  try {
+    const data = JSON.parse(line) as OllamaChatResponse
+
+    if (data.message?.content) {
+      yield { type: 'content', text: data.message.content }
+    }
+
+    if (data.done) {
+      // Handle tool calls (only present in final response)
+      if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
+        for (const toolCall of data.message.tool_calls) {
+          const toolCallId = generateToolCallId()
+          yield {
+            type: 'tool_start',
+            name: toolCall.function.name,
+            input: toolCall.function.arguments,
+            toolCallId,
+          }
+        }
+      }
+      return data
+    }
+
+    return null
+  } catch (parseError) {
+    context.log.warn('Failed to parse streaming chunk', {
+      line,
+      error: parseError instanceof Error ? parseError.message : String(parseError),
+    })
+    return null
+  }
+}
+
+/**
+ * Streams a chat response from the Ollama server.
+ * Uses streaming fetch to yield content progressively as it arrives.
  */
 async function* streamChat(
   context: ExtensionContext,
@@ -129,7 +170,7 @@ async function* streamChat(
   const url = (options.settings?.url as string) || DEFAULT_OLLAMA_URL
   const model = options.model || DEFAULT_MODEL
 
-  context.log.debug('Starting chat with Ollama', { url, model, messageCount: messages.length })
+  context.log.debug('Starting streaming chat with Ollama', { url, model, messageCount: messages.length })
 
   // Convert messages to Ollama format
   const ollamaMessages: OllamaChatMessage[] = messages.map(convertMessageToOllama)
@@ -138,12 +179,10 @@ async function* streamChat(
   const ollamaTools = convertToolsToOllama(options.tools)
 
   try {
-    // NOTE: stream: false because worker message-passing doesn't support streaming fetch yet
-    // The host's handleNetworkFetch uses response.text() which blocks on streaming responses
     const requestBody: Record<string, unknown> = {
       model,
       messages: ollamaMessages,
-      stream: false,
+      stream: true, // Enable streaming
       options: {
         temperature: options.temperature,
         num_predict: options.maxTokens,
@@ -155,7 +194,8 @@ async function* streamChat(
       requestBody.tools = ollamaTools
     }
 
-    const response = await context.network!.fetch(`${url}/api/chat`, {
+    // Use streaming fetch
+    const stream = context.network!.fetchStream(`${url}/api/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -163,45 +203,67 @@ async function* streamChat(
       body: JSON.stringify(requestBody),
     })
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`Ollama error: ${response.status} - ${errorText}`)
+    // Check for HTTP errors if the stream exposes response metadata
+    const streamAny = stream as any
+    if (streamAny && typeof streamAny.ok === 'boolean' && !streamAny.ok) {
+      const status = typeof streamAny.status === 'number' ? streamAny.status : 'unknown'
+      const statusText = typeof streamAny.statusText === 'string' ? streamAny.statusText : 'HTTP error'
+      throw new Error(`Ollama streaming chat request failed with status ${status}: ${statusText}`)
     }
 
-    // With stream: false, we get a single JSON response
-    const data = (await response.json()) as OllamaChatResponse
+    let buffer = ''
+    let finalResponse: OllamaChatResponse | null = null
 
-    // Emit regular content response if present, even when tool_calls exist
-    if (data.message?.content) {
-      yield { type: 'content', text: data.message.content }
-    }
+    for await (const chunk of stream) {
+      buffer += chunk
 
-    // Check if the model wants to use tools
-    if (data.message?.tool_calls && data.message.tool_calls.length > 0) {
-      // Emit tool_start events for each tool call
-      for (const toolCall of data.message.tool_calls) {
-        const toolCallId = generateToolCallId()
-        yield {
-          type: 'tool_start',
-          name: toolCall.function.name,
-          input: toolCall.function.arguments,
-          toolCallId,
+      // Parse NDJSON - each line is a complete JSON object
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || '' // Keep incomplete line for next iteration
+
+      for (const line of lines) {
+        if (!line.trim()) continue
+
+        // Ollama sends cumulative content, so we yield the full text each time
+        // ChatStreamService will handle replacing (not appending) the content
+        const result = yield* processStreamLine(line, context)
+        if (result) {
+          finalResponse = result
         }
       }
     }
 
-    // Include usage stats if available
+    // Process any remaining data in the buffer (in case the final chunk lacked a trailing newline)
+    if (buffer.trim()) {
+      // Split in case there are multiple lines in the remaining buffer
+      const remainingLines = buffer.split('\n')
+      for (const line of remainingLines) {
+        if (!line.trim()) continue
+
+        const result = yield* processStreamLine(line, context)
+        if (result) {
+          finalResponse = result
+        }
+      }
+    }
+
+    // Verify that we received a complete stream with a final response
+    if (!finalResponse) {
+      context.log.warn('Streaming response completed without receiving final chunk (done=true)')
+    }
+
+    // Include usage stats if available from final response
     const usage =
-      data.prompt_eval_count !== undefined && data.eval_count !== undefined
+      finalResponse?.prompt_eval_count !== undefined && finalResponse?.eval_count !== undefined
         ? {
-            inputTokens: data.prompt_eval_count,
-            outputTokens: data.eval_count,
+            inputTokens: finalResponse.prompt_eval_count,
+            outputTokens: finalResponse.eval_count,
           }
         : undefined
 
     yield { type: 'done', usage }
   } catch (error) {
-    context.log.error('Ollama chat error', {
+    context.log.error('Ollama streaming chat error', {
       error: error instanceof Error ? error.message : String(error),
     })
 

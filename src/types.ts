@@ -68,7 +68,13 @@ export interface OllamaTool {
 }
 
 /**
- * Ollama chat API response
+ * Ollama chat API response.
+ *
+ * When streaming (stream: true), responses are sent as NDJSON lines:
+ * - Intermediate chunks: done=false, message.content contains cumulative text
+ * - Final chunk: done=true, includes usage stats (prompt_eval_count, eval_count, etc.)
+ *
+ * When not streaming (stream: false), a single response is returned with done=true.
  */
 export interface OllamaChatResponse {
   model: string

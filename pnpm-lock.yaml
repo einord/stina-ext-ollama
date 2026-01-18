@@ -9,8 +9,8 @@ importers:
   .:
     devDependencies:
       '@stina/extension-api':
-        specifier: ^0.6.5
-        version: 0.6.5
+        specifier: ^0.15.0
+        version: 0.15.0
       tsup:
         specifier: ^8.0.0
         version: 8.5.1(typescript@5.9.3)
@@ -299,8 +299,8 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@stina/extension-api@0.6.5':
-    resolution: {integrity: sha512-xwXe7W78US2vE3v7No14+ebeJWOzYXNwygbKVHf1HwIk0MYHenk88LbH6pUDm1bYKJCKXbq0IXMwnP5NrO06WQ==}
+  '@stina/extension-api@0.15.0':
+    resolution: {integrity: sha512-1c1S5CP7swzItkXg4c8yTkfGjnm2SecBJlFa5fGtwjK9dElj2koJRYgK6k1cXvJ3zYDvCsOpHO4e1X+tpaPu/g==}
 
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
@@ -665,7 +665,7 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.54.0':
     optional: true
 
-  '@stina/extension-api@0.6.5': {}
+  '@stina/extension-api@0.15.0': {}
 
   '@types/estree@1.0.8': {}
 

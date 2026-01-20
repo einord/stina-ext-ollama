@@ -14,9 +14,7 @@ import type {
   StreamEvent,
   ToolDefinition,
 } from '@stina/extension-api/runtime'
-
-/** LocalizedString type - matches @stina/extension-api definition */
-type LocalizedString = string | Record<string, string>
+import type { LocalizedString } from '@stina/extension-api'
 
 import { DEFAULT_OLLAMA_URL, DEFAULT_MODEL, PROVIDER_ID, PROVIDER_NAME } from './constants.js'
 import type { OllamaTagsResponse, OllamaChatResponse, OllamaChatMessage, OllamaTool } from './types.js'
@@ -25,15 +23,36 @@ let toolCallCounter = 0
 
 /**
  * Converts a LocalizedString to a plain string.
- * If the value is already a string, returns it directly.
- * If it's a Record, returns the English value or the first available value.
+ * If the value is already a string, returns it directly (with trimming).
+ * If it's a Record, returns the English value or the first available non-empty value.
+ * Falls back to a default message if no non-empty value can be found.
  */
 function localizedStringToString(value: LocalizedString): string {
+  const DEFAULT_LOCALIZED_FALLBACK = '[missing localized string]'
+
   if (typeof value === 'string') {
-    return value
+    const trimmed = value.trim()
+    return trimmed || DEFAULT_LOCALIZED_FALLBACK
   }
-  // Try English first, then fall back to first available key
-  return value['en'] || Object.values(value)[0] || ''
+
+  // Try English first
+  const enValue = typeof value['en'] === 'string' ? value['en'].trim() : ''
+  if (enValue) {
+    return enValue
+  }
+
+  // Fall back to the first non-empty value in the record
+  for (const candidate of Object.values(value)) {
+    if (typeof candidate === 'string') {
+      const trimmed = candidate.trim()
+      if (trimmed) {
+        return trimmed
+      }
+    }
+  }
+
+  // As a last resort, return a clear default instead of an empty string
+  return DEFAULT_LOCALIZED_FALLBACK
 }
 
 /** Simple ID generator for tool calls */

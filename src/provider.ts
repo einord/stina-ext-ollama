@@ -15,10 +15,26 @@ import type {
   ToolDefinition,
 } from '@stina/extension-api/runtime'
 
+/** LocalizedString type - matches @stina/extension-api definition */
+type LocalizedString = string | Record<string, string>
+
 import { DEFAULT_OLLAMA_URL, DEFAULT_MODEL, PROVIDER_ID, PROVIDER_NAME } from './constants.js'
 import type { OllamaTagsResponse, OllamaChatResponse, OllamaChatMessage, OllamaTool } from './types.js'
 
 let toolCallCounter = 0
+
+/**
+ * Converts a LocalizedString to a plain string.
+ * If the value is already a string, returns it directly.
+ * If it's a Record, returns the English value or the first available value.
+ */
+function localizedStringToString(value: LocalizedString): string {
+  if (typeof value === 'string') {
+    return value
+  }
+  // Try English first, then fall back to first available key
+  return value['en'] || Object.values(value)[0] || ''
+}
 
 /** Simple ID generator for tool calls */
 function generateToolCallId(): string {
@@ -90,7 +106,7 @@ function convertToolsToOllama(tools?: ToolDefinition[]): OllamaTool[] | undefine
     type: 'function' as const,
     function: {
       name: tool.id,
-      description: tool.description,
+      description: localizedStringToString(tool.description),
       parameters: tool.parameters,
     },
   }))
@@ -129,8 +145,9 @@ async function* streamChat(
 ): AsyncGenerator<StreamEvent, void, unknown> {
   const url = (options.settings?.url as string) || DEFAULT_OLLAMA_URL
   const model = options.model || DEFAULT_MODEL
+  const thinkingSetting = (options.settings?.thinking as string) || 'off'
 
-  context.log.debug('Starting streaming chat with Ollama', { url, model, messageCount: messages.length })
+  context.log.debug('Starting streaming chat with Ollama', { url, model, thinking: thinkingSetting, messageCount: messages.length })
 
   // Convert messages to Ollama format
   const ollamaMessages: OllamaChatMessage[] = messages.map(convertMessageToOllama)
@@ -152,6 +169,11 @@ async function* streamChat(
     // Add tools if available
     if (ollamaTools && ollamaTools.length > 0) {
       requestBody.tools = ollamaTools
+    }
+
+    // Add think parameter if enabled
+    if (thinkingSetting !== 'off') {
+      requestBody.think = thinkingSetting === 'on' ? true : thinkingSetting
     }
 
     // Use streaming fetch
@@ -178,6 +200,11 @@ async function* streamChat(
 
         try {
           const data = JSON.parse(line) as OllamaChatResponse
+
+          // Handle thinking content (yield before regular content)
+          if (data.message?.thinking) {
+            yield { type: 'thinking', text: data.message.thinking }
+          }
 
           // Ollama sends cumulative content, so we yield the full text each time
           // ChatStreamService will handle replacing (not appending) the content

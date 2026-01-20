@@ -27,8 +27,8 @@
     "url": "https://github.com/einord/stina-ext-ollama.git"
   },
   "devDependencies": {
-    "@stina/extension-api": "^0.15.0",
-    "tsup": "^8.0.0",
-    "typescript": "^5.3.0"
+    "@stina/extension-api": "^0.16.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
   }
 }

@@ -30,7 +30,8 @@
         "description": "Local AI models via Ollama",
         "suggestedDefaultModel": "llama3.2:8b",
         "defaultSettings": {
-          "url": "http://localhost:11434"
+          "url": "http://localhost:11434",
+          "thinking": "off"
         },
         "configSchema": {
           "order": ["url", "thinking"],

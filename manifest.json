@@ -30,10 +30,11 @@
         "description": "Local AI models via Ollama",
         "suggestedDefaultModel": "llama3.2:8b",
         "defaultSettings": {
-          "url": "http://localhost:11434"
+          "url": "http://localhost:11434",
+          "thinking": "off"
         },
         "configSchema": {
-          "order": ["url"],
+          "order": ["url", "thinking"],
           "properties": {
             "url": {
               "type": "url",
@@ -42,6 +43,19 @@
               "placeholder": "http://localhost:11434",
               "default": "http://localhost:11434",
               "required": true
+            },
+            "thinking": {
+              "type": "select",
+              "title": "Thinking Mode",
+              "description": "Enable thinking/reasoning for supported models (Qwen3, DeepSeek R1, etc.)",
+              "default": "off",
+              "options": [
+                { "value": "off", "label": "Off" },
+                { "value": "on", "label": "On" },
+                { "value": "low", "label": "Low (extended)" },
+                { "value": "medium", "label": "Medium (extended)" },
+                { "value": "high", "label": "High (extended)" }
+              ]
             }
           }
         }

@@ -14,11 +14,46 @@ import type {
   StreamEvent,
   ToolDefinition,
 } from '@stina/extension-api/runtime'
+import type { LocalizedString } from '@stina/extension-api'
 
 import { DEFAULT_OLLAMA_URL, DEFAULT_MODEL, PROVIDER_ID, PROVIDER_NAME } from './constants.js'
 import type { OllamaTagsResponse, OllamaChatResponse, OllamaChatMessage, OllamaTool } from './types.js'
 
 let toolCallCounter = 0
+
+/**
+ * Converts a LocalizedString to a plain string.
+ * If the value is already a string, returns it directly (with trimming).
+ * If it's a Record, returns the English value or the first available non-empty value.
+ * Falls back to a default message if no non-empty value can be found.
+ */
+function localizedStringToString(value: LocalizedString): string {
+  const DEFAULT_LOCALIZED_FALLBACK = '[missing localized string]'
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    return trimmed || DEFAULT_LOCALIZED_FALLBACK
+  }
+
+  // Try English first
+  const enValue = typeof value['en'] === 'string' ? value['en'].trim() : ''
+  if (enValue) {
+    return enValue
+  }
+
+  // Fall back to the first non-empty value in the record
+  for (const candidate of Object.values(value)) {
+    if (typeof candidate === 'string') {
+      const trimmed = candidate.trim()
+      if (trimmed) {
+        return trimmed
+      }
+    }
+  }
+
+  // As a last resort, return a clear default instead of an empty string
+  return DEFAULT_LOCALIZED_FALLBACK
+}
 
 /** Simple ID generator for tool calls */
 function generateToolCallId(): string {
@@ -90,7 +125,7 @@ function convertToolsToOllama(tools?: ToolDefinition[]): OllamaTool[] | undefine
     type: 'function' as const,
     function: {
       name: tool.id,
-      description: tool.description,
+      description: localizedStringToString(tool.description),
       parameters: tool.parameters,
     },
   }))
@@ -127,6 +162,11 @@ async function* processStreamLine(
 ): AsyncGenerator<StreamEvent, OllamaChatResponse | null, unknown> {
   try {
     const data = JSON.parse(line) as OllamaChatResponse
+
+    // Handle thinking content (yield before regular content)
+    if (data.message?.thinking) {
+      yield { type: 'thinking', text: data.message.thinking }
+    }
 
     if (data.message?.content) {
       yield { type: 'content', text: data.message.content }
@@ -169,8 +209,9 @@ async function* streamChat(
 ): AsyncGenerator<StreamEvent, void, unknown> {
   const url = (options.settings?.url as string) || DEFAULT_OLLAMA_URL
   const model = options.model || DEFAULT_MODEL
+  const thinkingSetting = (options.settings?.thinking as string) || 'off'
 
-  context.log.debug('Starting streaming chat with Ollama', { url, model, messageCount: messages.length })
+  context.log.debug('Starting streaming chat with Ollama', { url, model, thinking: thinkingSetting, messageCount: messages.length })
 
   // Convert messages to Ollama format
   const ollamaMessages: OllamaChatMessage[] = messages.map(convertMessageToOllama)
@@ -192,6 +233,11 @@ async function* streamChat(
     // Add tools if available
     if (ollamaTools && ollamaTools.length > 0) {
       requestBody.tools = ollamaTools
+    }
+
+    // Add think parameter if enabled
+    if (thinkingSetting !== 'off') {
+      requestBody.think = thinkingSetting === 'on' ? true : thinkingSetting
     }
 
     // Use streaming fetch

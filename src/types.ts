@@ -90,10 +90,12 @@ export interface OllamaChatResponse {
 }
 
 /**
- * Response message format (may include tool_calls)
+ * Response message format (may include tool_calls and thinking)
  */
 export interface OllamaChatMessageResponse {
   role: 'assistant'
   content: string
   tool_calls?: OllamaToolCall[]
+  /** Thinking/reasoning content (for thinking-enabled models like Qwen3, DeepSeek R1, etc.) */
+  thinking?: string
 }

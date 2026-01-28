@@ -132,11 +132,36 @@ function convertToolsToOllama(tools?: ToolDefinition[]): OllamaTool[] | undefine
 }
 
 /**
+ * Maps Stina internal message types to Ollama roles.
+ * This handles cases where the message has a 'type' field instead of 'role'.
+ */
+function mapTypeToRole(type: string): OllamaChatMessage['role'] {
+  switch (type) {
+    case 'instruction':
+    case 'system':
+      return 'system'
+    case 'user':
+      return 'user'
+    case 'assistant':
+    case 'stina':
+      return 'assistant'
+    case 'tool':
+      return 'tool'
+    default:
+      return 'user'
+  }
+}
+
+/**
  * Convert ChatMessage to Ollama format
  */
 function convertMessageToOllama(message: ChatMessage): OllamaChatMessage {
+  // Handle both 'role' (standard ChatMessage) and 'type' (Stina internal format)
+  const messageAny = message as unknown as Record<string, unknown>
+  const role = message.role ?? mapTypeToRole((messageAny['type'] as string) ?? 'user')
+
   const base: OllamaChatMessage = {
-    role: message.role as OllamaChatMessage['role'],
+    role: role as OllamaChatMessage['role'],
     content: message.content,
   }
 

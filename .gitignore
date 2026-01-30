@@ -25,3 +25,6 @@ Thumbs.db
 
 # npm lock file (using pnpm)
 package-lock.json
+
+# Local pnpm link overrides
+pnpm-workspace.yaml

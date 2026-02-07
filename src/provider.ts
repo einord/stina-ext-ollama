@@ -241,6 +241,20 @@ async function* streamChat(
   // Convert messages to Ollama format
   const ollamaMessages: OllamaChatMessage[] = messages.map(convertMessageToOllama)
 
+  // Convert mid-conversation system messages to user role.
+  // Many Ollama models only handle a system message at the start of the
+  // conversation; subsequent system messages (e.g. scheduled reminder
+  // instructions) are silently ignored. Re-mapping them to the user role
+  // ensures the model actually sees and responds to them.
+  let seenNonSystem = false
+  for (const msg of ollamaMessages) {
+    if (msg.role !== 'system') {
+      seenNonSystem = true
+    } else if (seenNonSystem) {
+      msg.role = 'user'
+    }
+  }
+
   // Convert tools to Ollama format
   const ollamaTools = convertToolsToOllama(options.tools)
 

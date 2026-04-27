@@ -33,30 +33,30 @@
           "url": "http://localhost:11434",
           "thinking": "off"
         },
-        "configSchema": {
-          "order": ["url", "thinking"],
-          "properties": {
-            "url": {
-              "type": "url",
-              "title": "Server URL",
-              "description": "URL to your Ollama server",
-              "placeholder": "http://localhost:11434",
-              "default": "http://localhost:11434",
-              "required": true
-            },
-            "thinking": {
-              "type": "select",
-              "title": "Thinking Mode",
-              "description": "Enable thinking/reasoning for supported models (Qwen3, DeepSeek R1, etc.)",
-              "default": "off",
-              "options": [
-                { "value": "off", "label": "Off" },
-                { "value": "on", "label": "On" },
-                { "value": "low", "label": "Low (extended)" },
-                { "value": "medium", "label": "Medium (extended)" },
-                { "value": "high", "label": "High (extended)" }
-              ]
-            }
+        "configView": {
+          "content": {
+            "component": "VerticalStack",
+            "gap": 1,
+            "children": [
+              {
+                "component": "TextInput",
+                "label": "Server URL",
+                "placeholder": "http://localhost:11434",
+                "value": "$settings.url"
+              },
+              {
+                "component": "Select",
+                "label": "Thinking Mode",
+                "selectedValue": "$settings.thinking",
+                "options": [
+                  { "value": "off", "label": "Off" },
+                  { "value": "on", "label": "On" },
+                  { "value": "low", "label": "Low (extended)" },
+                  { "value": "medium", "label": "Medium (extended)" },
+                  { "value": "high", "label": "High (extended)" }
+                ]
+              }
+            ]
           }
         }
       }

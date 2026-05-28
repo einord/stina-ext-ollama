@@ -1,3 +1,5 @@
+> **Moved to Forgejo:** This project now lives at [forgejo.nyqvist.app/jonte/stina-ext-ollama](https://forgejo.nyqvist.app/jonte/stina-ext-ollama). The GitHub repository is archived and kept as a read-only pointer to the new home.
+
 # Ollama AI Provider for Stina
 
 Connect [Stina](https://github.com/einord/stina) to your local [Ollama](https://ollama.ai) instance for private, offline AI conversations.
